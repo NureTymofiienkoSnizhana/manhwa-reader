@@ -50,12 +50,14 @@ const Home = () => {
   );
   
   // Fetch recommendations if authenticated
-  const { data: recommendationsData, isLoading: recommendationsLoading } = useQuery(
+  const { data: recommendationsData, isLoading: recommendationsLoading, error: recommendationsError } = useQuery(
     'recommendations',
     getRecommendations,
     { 
       enabled: isAuthenticated,
-      staleTime: 600000 // 10 minutes
+      staleTime: 600000,
+      retry: 1, 
+      onError: (error) => console.error('Error fetching recommendations:', error)
     }
   );
   
@@ -257,6 +259,20 @@ const Home = () => {
                   </Grid>
                 ))}
               </Grid>
+              ) : recommendationsError ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  Персоналізовані рекомендації тимчасово недоступні.
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  component={RouterLink}
+                  to="/browse"
+                  sx={{ mt: 2 }}
+                >
+                  Перейти в каталог
+                </Button>
+              </Box>
             ) : recommendationsData?.recommendations?.length > 0 ? (
             <Grid container spacing={3}>
               {recommendationsData.recommendations.map((rec, index) => (
