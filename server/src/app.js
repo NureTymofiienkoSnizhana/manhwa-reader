@@ -15,6 +15,7 @@ const manhwaRoutes = require('./routes/manhwaRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const userManhwaRoutes = require('./routes/userManhwaRoutes.js');
 
 // Load config
 const config = require('./config/config');
@@ -49,6 +50,9 @@ app.use('/api/manhwa', manhwaRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/user-manhwa', userManhwaRoutes);
+
+app.use('/uploads', express.static('public/uploads'));
 
 // Health check route
 app.get('/health', (req, res) => {

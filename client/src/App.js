@@ -21,6 +21,11 @@ import AdminLevelTasks from './pages/admin/AdminLevelTasks';
 import NotFound from './pages/error/NotFound';
 import Unauthorized from './pages/error/Unauthorized';
 import SearchResults from './pages/search/SearchResults';
+import UploadDashboard from './pages/upload/UploadDashboard';
+import UploadManhwa from './pages/upload/UploadManhwa';
+import EditManhwa from './pages/upload/EditManhwa';
+import UploadChapter from './pages/upload/UploadChapter';
+import ManageChapters from './pages/upload/ManageChapters';
 
 // Import components
 import Layout from './components/layout/Layout';
@@ -101,6 +106,15 @@ function App() {
                       <Route path="admin" element={<AdminDashboard />} />
                       <Route path="admin/users" element={<AdminUsers />} />
                       <Route path="admin/level-tasks" element={<AdminLevelTasks />} />
+                    </Route>
+
+                    {/* Upload manhwa routes */}
+                    <Route element={<ProtectedRoute allowedRoles={['translator', 'admin']} />}>
+                      <Route path="upload/dashboard" element={<UploadDashboard />} />
+                      <Route path="upload/new" element={<UploadManhwa />} />
+                      <Route path="upload/edit/:manhwaId" element={<EditManhwa />} />
+                      <Route path="upload/chapter/:manhwaId" element={<UploadChapter />} />
+                      <Route path="upload/chapters/:manhwaId" element={<ManageChapters />} />
                     </Route>
                     
                     <Route path="*" element={<NotFound />} />

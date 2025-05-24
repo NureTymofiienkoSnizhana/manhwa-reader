@@ -20,7 +20,8 @@ import {
   Category as CategoryIcon,
   Settings as SettingsIcon,
   AccountCircle as ProfileIcon,
-  Dashboard as AdminIcon
+  Dashboard as AdminIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
@@ -125,6 +126,21 @@ const Sidebar = ({ open, onClose }) => {
               <ListItemText primary={t('nav.categories')} />
             </ListItem>
           </>
+        )}
+
+        {isAuthenticated && (user.role === 'translator' || user.role === 'admin') && (
+          <ListItem 
+            button 
+            component={Link} 
+            to="/upload/dashboard" 
+            selected={isActive('/upload/dashboard')}
+            onClick={onClose}
+          >
+            <ListItemIcon>
+              <CloudUploadIcon />
+            </ListItemIcon>
+            <ListItemText primary={t('upload.dashboard')} />
+          </ListItem>
         )}
       </List>
       

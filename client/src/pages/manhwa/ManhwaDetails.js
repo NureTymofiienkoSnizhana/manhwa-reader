@@ -16,6 +16,7 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  ListItemSecondaryAction,
   TextField,
   Dialog,
   DialogTitle,
@@ -46,12 +47,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../hooks/useNotification';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ManhwaDetails = () => {
   const { t } = useTranslation();
   const { manhwaId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { showSuccess, showError } = useNotification();
   const queryClient = useQueryClient();
   
@@ -65,21 +69,82 @@ const ManhwaDetails = () => {
 
   const [isAddingToLibrary, setIsAddingToLibrary] = useState(false);
   
-  // Fetch manhwa details
-  const { data: detailsData, isLoading: detailsLoading } = useQuery(
+  // Визначаємо, чи це користувацька манга чи зовнішня
+  const isUserManga = manhwaId.length === 24 && /^[0-9a-fA-F]{24}$/.test(manhwaId);
+  
+  // Fetch manhwa details - з урахуванням типу манги (користувацька чи зовнішня)
+  const { data: detailsData, isLoading: detailsLoading, error: detailsError } = useQuery(
     ['manhwaDetails', manhwaId],
-    () => getManhwaDetails(manhwaId),
-    { staleTime: 300000 } // 5 minutes
+    async () => {
+      try {
+        if (isUserManga) {
+          console.log("Fetching user manhwa details");
+          const response = await axios.get(`${API_URL}/user-manhwa/${manhwaId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          return response.data;
+        } else {
+          console.log("Fetching external manhwa details");
+          const response = await axios.get(`${API_URL}/manhwa/${manhwaId}`);
+          return response.data;
+        }
+      } catch (error) {
+        console.error("Error fetching manhwa details:", error);
+        throw error;
+      }
+    },
+    { 
+      staleTime: 300000, // 5 хвилин
+      retry: 1,
+      onError: (error) => {
+        console.error("Error in useQuery:", error);
+        showError(error.response?.data?.message || t('common.error'));
+      }
+    }
   );
   
-  // Fetch manhwa chapters
+  // Отримання глав окремим запитом, якщо вони не включені в детальну інформацію
   const { data: chaptersData, isLoading: chaptersLoading } = useQuery(
     ['manhwaChapters', manhwaId],
-    () => getManhwaChapters(manhwaId),
-    { staleTime: 300000 } // 5 minutes
+    async () => {
+      try {
+        if (isUserManga) {
+          // Якщо chapters вже включені в detailsData, пропускаємо цей запит
+          if (detailsData?.chapters) {
+            return { chapters: detailsData.chapters };
+          }
+          
+          const response = await axios.get(`${API_URL}/user-manhwa/${manhwaId}/chapters`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          return response.data;
+        } else {
+          const response = await getManhwaChapters(manhwaId);
+          return response;
+        }
+      } catch (error) {
+        console.error("Error fetching chapters:", error);
+        throw error;
+      }
+    },
+    { 
+      enabled: !!detailsData && !detailsData.chapters, // Запит активний тільки якщо у detailsData немає chapters
+      staleTime: 300000 // 5 хвилин
+    }
   );
   
-  // Mutation for updating reading progress
+  // Отримуємо інформацію про манхву та глави
+  const manga = isUserManga ? detailsData?.manhwa : detailsData?.manga;
+  const userProgress = detailsData?.userProgress;
+  
+  // Отримуємо глави або з detailsData, або з chaptersData
+  const chapters = detailsData?.chapters || chaptersData?.chapters || [];
+  
+  // Мутація для оновлення прогресу читання (тільки для зовнішніх манхв)
   const updateProgressMutation = useMutation(
     (progressData) => updateReadingProgress(manhwaId, progressData),
     {
@@ -92,11 +157,6 @@ const ManhwaDetails = () => {
       }
     }
   );
-  
-  // Get manhwa and progress from data
-  const manga = detailsData?.manga;
-  const userProgress = detailsData?.userProgress;
-  const chapters = chaptersData?.chapters || [];
   
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -111,6 +171,7 @@ const ManhwaDetails = () => {
   // Close menu
   const handleMenuClose = () => {
     setAnchorEl(null);
+    setSelectedStatus(null);
   };
   
   // Update status
@@ -208,11 +269,6 @@ const ManhwaDetails = () => {
     });
   };
   
-  // Open add to category dialog
-  const handleOpenCategoryDialog = () => {
-    setOpenCategoryDialog(true);
-  };
-  
   // Format publication date
   const formatDate = (dateString) => {
     try {
@@ -227,10 +283,10 @@ const ManhwaDetails = () => {
     return (
       <Container maxWidth="lg">
         <Grid container spacing={4}>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Skeleton variant="rectangular" height={500} />
           </Grid>
-          <Grid size={{ xs: 12, md: 8 }}>
+          <Grid item xs={12} md={8}>
             <Skeleton variant="text" height={60} />
             <Skeleton variant="text" width="60%" />
             <Skeleton variant="text" />
@@ -248,7 +304,8 @@ const ManhwaDetails = () => {
   }
   
   // Error state
-  if (!manga) {
+  if (detailsError || !manga) {
+    console.error("Error details:", detailsError);
     return (
       <Container maxWidth="lg">
         <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -256,7 +313,7 @@ const ManhwaDetails = () => {
             {t('common.error')}
           </Typography>
           <Typography>
-            {t('common.tryAgain')}
+            {detailsError?.response?.data?.message || t('common.tryAgain')}
           </Typography>
           <Button 
             variant="contained" 
@@ -271,11 +328,14 @@ const ManhwaDetails = () => {
     );
   }
   
+  // Визначаємо, чи користувач є автором манги (для користувацьких манг)
+  const isAuthor = isUserManga && manga.creator && user && manga.creator === user.id;
+  
   return (
     <Container maxWidth="lg">
       <Grid container spacing={4}>
         {/* Cover image and actions */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid item xs={12} md={4}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -292,18 +352,28 @@ const ManhwaDetails = () => {
             
             {isAuthenticated && (
               <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  onClick={handleStartReading}
-                  startIcon={<VisibilityIcon />}
-                  disabled={chapters.length === 0}
-                >
-                  {t('manhwa.readNow')}
-                </Button>
+                {chapters && chapters.length > 0 ? (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    onClick={handleStartReading}
+                    startIcon={<VisibilityIcon />}
+                  >
+                    {t('manhwa.readNow')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    disabled
+                  >
+                    {t('manhwa.noChapters')}
+                  </Button>
+                )}
                 
-                {!userProgress ? (
+                {!isUserManga && !userProgress ? (
                   <Button
                     variant="outlined"
                     fullWidth
@@ -313,77 +383,91 @@ const ManhwaDetails = () => {
                   >
                     {isAddingToLibrary ? t('common.loading') : t('manhwa.addToLibrary')}
                   </Button>
-                ) : (
+                ) : !isUserManga && (
                   <>
-                      <Button
-                        variant="outlined"
-                        fullWidth
-                        onClick={handleMenuOpen}
-                        endIcon={<MoreVertIcon />}
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={handleMenuOpen}
+                      endIcon={<MoreVertIcon />}
+                    >
+                      {t(`library.${userProgress.status || 'reading'}`)}
+                    </Button>
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={Boolean(anchorEl)}
+                      onClose={handleMenuClose}
+                    >
+                      <MenuItem 
+                        onClick={() => handleStatusChange('reading')}
+                        selected={userProgress.status === 'reading'}
                       >
-                        {t(`library.${userProgress.status || 'reading'}`)}
-                      </Button>
-                      <Menu
-                        anchorEl={anchorEl}
-                        open={Boolean(anchorEl)}
-                        onClose={handleMenuClose}
+                        {t('library.reading')}
+                      </MenuItem>
+                      <MenuItem 
+                        onClick={() => handleStatusChange('completed')}
+                        selected={userProgress.status === 'completed'}
                       >
-                        <MenuItem 
-                          onClick={() => handleStatusChange('reading')}
-                          selected={userProgress.status === 'reading'}
-                        >
-                          {t('library.reading')}
-                        </MenuItem>
-                        <MenuItem 
-                          onClick={() => handleStatusChange('completed')}
-                          selected={userProgress.status === 'completed'}
-                        >
-                          {t('library.completed')}
-                        </MenuItem>
-                        <MenuItem 
-                          onClick={() => handleStatusChange('plan_to_read')}
-                          selected={userProgress.status === 'plan_to_read'}
-                        >
-                          {t('library.planToRead')}
-                        </MenuItem>
-                        <MenuItem 
-                          onClick={() => handleStatusChange('dropped')}
-                          selected={userProgress.status === 'dropped'}
-                        >
-                          {t('library.dropped')}
-                        </MenuItem>
-                      </Menu>
-                    </>
-                  )}
+                        {t('library.completed')}
+                      </MenuItem>
+                      <MenuItem 
+                        onClick={() => handleStatusChange('plan_to_read')}
+                        selected={userProgress.status === 'plan_to_read'}
+                      >
+                        {t('library.planToRead')}
+                      </MenuItem>
+                      <MenuItem 
+                        onClick={() => handleStatusChange('dropped')}
+                        selected={userProgress.status === 'dropped'}
+                      >
+                        {t('library.dropped')}
+                      </MenuItem>
+                    </Menu>
+                  </>
+                )}
                 
-                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                {isUserManga && isAuthor && (
                   <Button
                     variant="outlined"
-                    sx={{ flex: 1 }}
-                    onClick={handleOpenReviewDialog}
+                    fullWidth
+                    component={RouterLink}
+                    to={`/upload/edit/${manhwaId}`}
                     startIcon={<CreateIcon />}
                   >
-                    {userProgress?.review ? t('manhwa.editReview') : t('manhwa.addReview')}
+                    {t('common.edit')}
                   </Button>
-                  
-                  <IconButton
-                    color={userProgress?.isLiked ? 'secondary' : 'default'}
-                    onClick={handleToggleLike}
-                  >
-                    {userProgress?.isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                  </IconButton>
-                  
-                  <IconButton>
-                    <ShareIcon />
-                  </IconButton>
-                </Box>
+                )}
+                
+                {!isUserManga && (
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button
+                      variant="outlined"
+                      sx={{ flex: 1 }}
+                      onClick={handleOpenReviewDialog}
+                      startIcon={<CreateIcon />}
+                    >
+                      {userProgress?.review ? t('manhwa.editReview') : t('manhwa.addReview')}
+                    </Button>
+                    
+                    <IconButton
+                      color={userProgress?.isLiked ? 'secondary' : 'default'}
+                      onClick={handleToggleLike}
+                    >
+                      {userProgress?.isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                    </IconButton>
+                    
+                    <IconButton>
+                      <ShareIcon />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
             )}
           </motion.div>
         </Grid>
         
         {/* Manhwa details */}
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid item xs={12} md={8}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -404,10 +488,20 @@ const ManhwaDetails = () => {
                   clickable
                 />
               ))}
+              {manga.genres?.map((genre, index) => (
+                <Chip 
+                  key={index} 
+                  label={genre} 
+                  size="small" 
+                  component={RouterLink}
+                  to={`/browse?genre=${genre}`}
+                  clickable
+                />
+              ))}
             </Box>
             
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid item xs={6} sm={3}>
                 <Typography variant="subtitle2" color="text.secondary">
                   {t('manhwa.status')}
                 </Typography>
@@ -416,7 +510,7 @@ const ManhwaDetails = () => {
                 </Typography>
               </Grid>
               
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid item xs={6} sm={3}>
                 <Typography variant="subtitle2" color="text.secondary">
                   {t('manhwa.author')}
                 </Typography>
@@ -425,16 +519,17 @@ const ManhwaDetails = () => {
                 </Typography>
               </Grid>
               
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid item xs={6} sm={3}>
                 <Typography variant="subtitle2" color="text.secondary">
                   {t('manhwa.releaseDate')}
                 </Typography>
                 <Typography variant="body1">
-                  {manga.publishedAt ? formatDate(manga.publishedAt) : 'Unknown'}
+                  {manga.publishedAt ? formatDate(manga.publishedAt) : 
+                   manga.createdAt ? formatDate(manga.createdAt) : 'Unknown'}
                 </Typography>
               </Grid>
               
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid item xs={6} sm={3}>
                 <Typography variant="subtitle2" color="text.secondary">
                   {t('manhwa.rating')}
                 </Typography>
@@ -471,24 +566,29 @@ const ManhwaDetails = () => {
                   Array.from(new Array(10)).map((_, index) => (
                     <Skeleton key={index} height={60} sx={{ my: 1 }} />
                   ))
-                ) : chapters.length > 0 ? (
+                ) : chapters && chapters.length > 0 ? (
                   <Paper variant="outlined">
                     <List sx={{ p: 0 }}>
                       {chapters.map((chapter, index) => (
-                        <React.Fragment key={chapter.id}>
+                        <React.Fragment key={chapter.id || chapter._id}>
                           {index > 0 && <Divider />}
                           <ListItem
                             button
                             component={RouterLink}
-                            to={`/read/${chapter.id}`}
+                            to={isUserManga 
+                              ? `/read/${manhwaId}/chapter/${chapter._id}` 
+                              : `/read/${chapter.id}`
+                            }
                             sx={{
-                              bgcolor: userProgress?.lastChapterRead >= chapter.chapter ? 'action.selected' : 'inherit'
+                              bgcolor: userProgress?.lastChapterRead >= chapter.chapter 
+                                ? 'action.selected' 
+                                : 'inherit'
                             }}
                           >
                             <ListItemText
                               primary={
                                 <Box>
-                                  {t('manhwa.chapterNumber', { number: chapter.chapter })}
+                                  {t('manhwa.chapterNumber', { number: chapter.chapter || chapter.chapterNumber })}
                                   {chapter.title && `: ${chapter.title}`}
                                 </Box>
                               }
@@ -496,12 +596,12 @@ const ManhwaDetails = () => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                                   <AccessTimeIcon sx={{ fontSize: '0.875rem', mr: 0.5 }} />
                                   <Box component="span">
-                                    {formatDate(chapter.publishedAt)}
+                                    {formatDate(chapter.publishedAt || chapter.createdAt)}
                                   </Box>
                                 </Box>
                               }
                             />
-                            {userProgress?.lastChapterRead >= chapter.chapter && (
+                            {userProgress?.lastChapterRead >= (chapter.chapter || chapter.chapterNumber) && (
                               <ListItemIcon sx={{ minWidth: 'auto' }}>
                                 <VisibilityIcon color="primary" fontSize="small" />
                               </ListItemIcon>
@@ -515,6 +615,21 @@ const ManhwaDetails = () => {
                   <Typography>
                     {t('manhwa.noChapters')}
                   </Typography>
+                )}
+                
+                {/* Додаткова кнопка для авторів користувацьких манг */}
+                {isUserManga && isAuthor && (
+                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      component={RouterLink}
+                      to={`/upload/chapter/${manhwaId}`}
+                      startIcon={<CreateIcon />}
+                    >
+                      {t('upload.addChapter')}
+                    </Button>
+                  </Box>
                 )}
               </Box>
             )}

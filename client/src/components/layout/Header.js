@@ -247,6 +247,12 @@ const Header = ({ toggleSidebar }) => {
                   {t('admin.dashboard')}
                 </MenuItem>
               )}
+
+              {(user.role === 'translator' || user.role === 'admin') && (
+                <MenuItem component={Link} to="/upload/dashboard" onClick={handleUserMenuClose}>
+                  {t('upload.dashboard')}
+                </MenuItem>
+              )}
               
               <Divider />
               <MenuItem onClick={handleLogout}>
