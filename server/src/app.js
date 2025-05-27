@@ -7,6 +7,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const checkAndCreateDirectories = require('./utils/checkDirectories');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
@@ -22,6 +23,9 @@ const config = require('./config/config');
 
 // Initialize app
 const app = express();
+
+// Check and create required directories
+checkAndCreateDirectories();
 
 // Connect to MongoDB
 connectDB();
@@ -53,6 +57,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/user-manhwa', userManhwaRoutes);
 
 app.use('/uploads', express.static('public/uploads'));
+app.use('/public', express.static('public'));
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -65,6 +70,29 @@ app.use(errorHandler);
 // Not found handler
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
+});
+
+app.get('/check-file', (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) {
+    return res.status(400).json({ error: 'No file path provided' });
+  }
+  
+  const fullPath = path.join(process.cwd(), filePath);
+  
+  if (fs.existsSync(fullPath)) {
+    return res.json({ 
+      exists: true, 
+      path: fullPath,
+      stats: fs.statSync(fullPath)
+    });
+  }
+  
+  return res.json({ 
+    exists: false, 
+    path: fullPath,
+    searchedIn: process.cwd()
+  });
 });
 
 // Start server

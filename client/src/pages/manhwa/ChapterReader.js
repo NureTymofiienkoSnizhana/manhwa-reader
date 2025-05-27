@@ -41,10 +41,13 @@ import { getChapterContent, getManhwaChapters, updateReadingProgress } from '../
 import { getManhwaDetails } from '../../api/manhwaService';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const ChapterReader = () => {
   const { t } = useTranslation();
-  const { chapterId } = useParams();
+  const { chapterId, manhwaId } = useParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
@@ -58,93 +61,126 @@ const ChapterReader = () => {
   const [showControls, setShowControls] = useState(true);
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  
-  // Fetch chapter content
-  const { data: chapterData, isLoading: chapterLoading } = useQuery(
-    ['chapterContent', chapterId],
-    () => getChapterContent(chapterId),
-    { staleTime: 300000 } // 5 minutes
-  );
-  
-  // Use the chapter info from the chapters query to get manga ID, chapter number etc.
-  const [manhwaId, setManhwaId] = useState(null);
+  const [chapterData, setChapterData] = useState(null);
+  const [chapterManhwaId, setChapterManhwaId] = useState(null);
   const [chapterNumber, setChapterNumber] = useState(null);
+  
+  // Визначаємо, чи це користувацька манга чи зовнішня
+  const isUserManhwa = manhwaId && chapterId;
+  
+  // Отримання даних глави
+  useEffect(() => {
+    const fetchChapterContent = async () => {
+      try {
+        if (isUserManhwa) {
+          // Запит для користувацької манги
+          const response = await axios.get(`${API_URL}/user-manhwa/chapter/${chapterId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          setChapterData(response.data);
+          setChapterManhwaId(manhwaId);
+          setChapterNumber(response.data.chapter?.chapterNumber || '1');
+        } else {
+          // Запит для зовнішніх манг
+          const response = await getChapterContent(chapterId);
+          setChapterData(response);
+          
+          // Отримуємо інформацію про главу для отримання manhwaId
+          try {
+            const chapterInfoResponse = await fetch(`${process.env.REACT_APP_MANGADEX_API_URL}/chapter/${chapterId}`);
+            const data = await chapterInfoResponse.json();
+            
+            if (data.data) {
+              const mangaId = data.data.relationships.find(rel => rel.type === 'manga')?.id;
+              if (mangaId) {
+                setChapterManhwaId(mangaId);
+                setChapterNumber(data.data.attributes.chapter);
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching chapter info:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching chapter content:', error);
+      }
+    };
+
+    if (chapterId) {
+      fetchChapterContent();
+    }
+  }, [chapterId, manhwaId, isUserManhwa]);
   
   // Fetch chapters to get the current chapter info
   const { data: chaptersData } = useQuery(
-    ['manhwaChapters', manhwaId],
-    () => getManhwaChapters(manhwaId),
+    ['manhwaChapters', chapterManhwaId],
+    () => isUserManhwa 
+      ? axios.get(`${API_URL}/user-manhwa/${chapterManhwaId}/chapters`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        }).then(res => res.data)
+      : getManhwaChapters(chapterManhwaId),
     { 
-      enabled: !!manhwaId,
+      enabled: !!chapterManhwaId,
       staleTime: 300000 // 5 minutes
     }
   );
   
   // Fetch manhwa details to show title
   const { data: detailsData } = useQuery(
-    ['manhwaDetails', manhwaId],
-    () => getManhwaDetails(manhwaId),
+    ['manhwaDetails', chapterManhwaId],
+    () => isUserManhwa
+      ? axios.get(`${API_URL}/user-manhwa/${chapterManhwaId}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        }).then(res => res.data)
+      : getManhwaDetails(chapterManhwaId),
     { 
-      enabled: !!manhwaId,
+      enabled: !!chapterManhwaId,
       staleTime: 300000 // 5 minutes
     }
   );
   
   // Mutation for updating reading progress
   const updateProgressMutation = useMutation(
-    (progressData) => updateReadingProgress(manhwaId, progressData),
+    (progressData) => updateReadingProgress(chapterManhwaId, progressData),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(['manhwaDetails', manhwaId]);
+        queryClient.invalidateQueries(['manhwaDetails', chapterManhwaId]);
         setShowSnackbar(true);
       }
     }
   );
   
-  // Get the manhwa ID from the chapter info
-  useEffect(() => {
-    const fetchChapterInfo = async () => {
-      try {
-        // Make a direct API call to get chapter info
-        const response = await fetch(`${process.env.REACT_APP_MANGADEX_API_URL}/chapter/${chapterId}`);
-        const data = await response.json();
-        
-        if (data.data) {
-          const mangaId = data.data.relationships.find(rel => rel.type === 'manga')?.id;
-          if (mangaId) {
-            setManhwaId(mangaId);
-            setChapterNumber(data.data.attributes.chapter);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching chapter info:', error);
-      }
-    };
-    
-    if (chapterId) {
-      fetchChapterInfo();
-    }
-  }, [chapterId]);
-  
   // Update reading progress when chapter is loaded
   useEffect(() => {
-    if (isAuthenticated && manhwaId && chapterNumber) {
+    if (isAuthenticated && chapterManhwaId && chapterNumber) {
       updateProgressMutation.mutate({ 
         lastChapterRead: parseInt(chapterNumber),
         isCompleted: false // Don't mark as completed yet
       });
     }
-  }, [isAuthenticated, manhwaId, chapterNumber, updateProgressMutation]);
+  }, [isAuthenticated, chapterManhwaId, chapterNumber, updateProgressMutation]);
   
   // Get pages
-  const pages = chapterData?.pages || [];
+  const pages = isUserManhwa
+    ? chapterData?.chapter?.pages || []
+    : chapterData?.pages || [];
   
   // Get manga info
-  const manga = detailsData?.manga;
-  const chapters = chaptersData?.chapters || [];
+  const manga = isUserManhwa 
+    ? detailsData?.manhwa
+    : detailsData?.manga;
+    
+  const chapters = isUserManhwa
+    ? chaptersData?.chapters || []
+    : chaptersData?.chapters || [];
   
   // Find current chapter index
-  const currentChapterIndex = chapters.findIndex(ch => ch.id === chapterId);
+  const currentChapterIndex = chapters.findIndex(ch => 
+    isUserManhwa ? ch._id === chapterId : ch.id === chapterId
+  );
   
   // Get next and previous chapters
   const prevChapter = currentChapterIndex > 0 ? chapters[currentChapterIndex - 1] : null;
@@ -197,22 +233,31 @@ const ChapterReader = () => {
       setCurrentPage(currentPage + 1);
     } else if (nextChapter) {
       // Go to next chapter
-      navigate(`/read/${nextChapter.id}`);
+      navigate(isUserManhwa
+        ? `/read/${chapterManhwaId}/chapter/${nextChapter._id}`
+        : `/read/${nextChapter.id}`
+      );
     }
   };
   
   // Navigate to previous chapter
   const goToPrevChapter = () => {
     if (prevChapter) {
-      navigate(`/read/${prevChapter.id}`);
+      navigate(isUserManhwa
+        ? `/read/${chapterManhwaId}/chapter/${prevChapter._id}`
+        : `/read/${prevChapter.id}`
+      );
     }
   };
   
   // Navigate to next chapter
   const goToNextChapter = () => {
     if (nextChapter) {
-      navigate(`/read/${nextChapter.id}`);
-    } else if (manhwaId) {
+      navigate(isUserManhwa
+        ? `/read/${chapterManhwaId}/chapter/${nextChapter._id}`
+        : `/read/${nextChapter.id}`
+      );
+    } else if (chapterManhwaId) {
       // Mark as completed if this is the last chapter
       updateProgressMutation.mutate({ 
         isCompleted: true,
@@ -220,7 +265,7 @@ const ChapterReader = () => {
       });
       
       // Navigate back to manhwa page
-      navigate(`/manhwa/${manhwaId}`);
+      navigate(`/manhwa/${chapterManhwaId}`);
     }
   };
   
@@ -297,7 +342,7 @@ const ChapterReader = () => {
                   edge="start" 
                   color="inherit" 
                   aria-label="back"
-                  onClick={() => navigate(manhwaId ? `/manhwa/${manhwaId}` : '/browse')}
+                  onClick={() => navigate(chapterManhwaId ? `/manhwa/${chapterManhwaId}` : '/browse')}
                 >
                   <ArrowBackIcon />
                 </IconButton>
@@ -416,15 +461,21 @@ const ChapterReader = () => {
             {chapters.map((chapter) => (
               <ListItem
                 button
-                key={chapter.id}
+                key={isUserManhwa ? chapter._id : chapter.id}
                 onClick={() => {
-                  navigate(`/read/${chapter.id}`);
+                  navigate(isUserManhwa
+                    ? `/read/${chapterManhwaId}/chapter/${chapter._id}`
+                    : `/read/${chapter.id}`
+                  );
                   toggleDrawer();
                 }}
-                selected={chapter.id === chapterId}
+                selected={isUserManhwa
+                  ? chapter._id === chapterId
+                  : chapter.id === chapterId
+                }
               >
                 <ListItemText 
-                  primary={`${t('manhwa.chapterNumber', { number: chapter.chapter })}`}
+                  primary={`${t('manhwa.chapterNumber', { number: chapter.chapter || chapter.chapterNumber })}`}
                   secondary={chapter.title}
                 />
               </ListItem>
@@ -442,7 +493,7 @@ const ChapterReader = () => {
         }}
         onClick={handleContentClick}
       >
-        {chapterLoading ? (
+        {!chapterData ? (
           <Container maxWidth="md" sx={{ py: 4 }}>
             {Array.from(new Array(5)).map((_, index) => (
               <Skeleton 
@@ -613,7 +664,7 @@ const ChapterReader = () => {
               </Typography>
               <Button 
                 variant="contained"
-                onClick={() => navigate(manhwaId ? `/manhwa/${manhwaId}` : '/browse')}
+                onClick={() => navigate(chapterManhwaId ? `/manhwa/${chapterManhwaId}` : '/browse')}
                 sx={{ mt: 2 }}
               >
                 {t('common.back')}

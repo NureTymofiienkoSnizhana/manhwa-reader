@@ -30,8 +30,6 @@ import {
   Tab,
 } from '@mui/material';
 import {
-  Favorite as FavoriteIcon,
-  FavoriteBorder as FavoriteBorderIcon,
   BookmarkAdd as BookmarkAddIcon,
   Create as CreateIcon,
   Visibility as VisibilityIcon,
@@ -66,7 +64,6 @@ const ManhwaDetails = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
-
   const [isAddingToLibrary, setIsAddingToLibrary] = useState(false);
   
   // Визначаємо, чи це користувацька манга чи зовнішня
@@ -148,12 +145,14 @@ const ManhwaDetails = () => {
   const updateProgressMutation = useMutation(
     (progressData) => updateReadingProgress(manhwaId, progressData),
     {
-      onSuccess: () => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries(['manhwaDetails', manhwaId]);
-        showSuccess(t('common.success'));
+        showSuccess(data.message || t('common.success'));
+        setIsAddingToLibrary(false);
       },
       onError: (error) => {
         showError(error.message || t('common.error'));
+        setIsAddingToLibrary(false);
       }
     }
   );
@@ -177,15 +176,9 @@ const ManhwaDetails = () => {
   // Update status
   const handleStatusChange = (status) => {
     setSelectedStatus(status);
+    setIsAddingToLibrary(true);
     updateProgressMutation.mutate({ status });
     handleMenuClose();
-  };
-  
-  // Toggle liked status
-  const handleToggleLike = () => {
-    updateProgressMutation.mutate({ 
-      isLiked: userProgress ? !userProgress.isLiked : true 
-    });
   };
   
   // Open review dialog
@@ -231,38 +224,27 @@ const ManhwaDetails = () => {
     }
   };
   
-  // Add to library
+  // Add to library - виправлена логіка
   const handleAddToLibrary = () => {
-    // Show loading state on button while request is in progress
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
+    // Показуємо стан завантаження
     setIsAddingToLibrary(true);
     
+    // Додаємо з статусом 'reading' за замовчуванням
     updateProgressMutation.mutate({ 
-      status: selectedStatus || 'reading' 
-    }, {
-      onSuccess: (data) => {
-        // Force update of user progress in UI without requiring a refetch
-        queryClient.setQueryData(['manhwaDetails', manhwaId], (oldData) => {
-          return {
-            ...oldData,
-            userProgress: data.progress
-          };
-        });
-        
-        // Reset loading state
-        setIsAddingToLibrary(false);
-        
-        // Show success notification
-        showSuccess(t('manhwa.addedToLibrary'));
-      },
-      onError: (error) => {
-        setIsAddingToLibrary(false);
-        showError(error.message || t('common.error'));
-      }
+      status: 'reading',
+      lastChapterRead: 0,
+      isCompleted: false
     });
   };
   
   // Mark as completed
   const handleMarkAsCompleted = () => {
+    setIsAddingToLibrary(true);
     updateProgressMutation.mutate({ 
       isCompleted: true,
       status: 'completed'
@@ -283,10 +265,10 @@ const ManhwaDetails = () => {
     return (
       <Container maxWidth="lg">
         <Grid container spacing={4}>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 4, md: 4 }}>
             <Skeleton variant="rectangular" height={500} />
           </Grid>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={8} md={8}>
             <Skeleton variant="text" height={60} />
             <Skeleton variant="text" width="60%" />
             <Skeleton variant="text" />
@@ -334,8 +316,8 @@ const ManhwaDetails = () => {
   return (
     <Container maxWidth="lg">
       <Grid container spacing={4}>
-        {/* Cover image and actions */}
-        <Grid item xs={12} md={4}>
+        {/* Cover image - завжди зліва */}
+        <Grid size={{ xs: 4, md: 4 }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -350,6 +332,7 @@ const ManhwaDetails = () => {
               />
             </Card>
             
+            {/* Action buttons під обкладинкою */}
             {isAuthenticated && (
               <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {chapters && chapters.length > 0 ? (
@@ -449,13 +432,6 @@ const ManhwaDetails = () => {
                       {userProgress?.review ? t('manhwa.editReview') : t('manhwa.addReview')}
                     </Button>
                     
-                    <IconButton
-                      color={userProgress?.isLiked ? 'secondary' : 'default'}
-                      onClick={handleToggleLike}
-                    >
-                      {userProgress?.isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                    </IconButton>
-                    
                     <IconButton>
                       <ShareIcon />
                     </IconButton>
@@ -466,8 +442,8 @@ const ManhwaDetails = () => {
           </motion.div>
         </Grid>
         
-        {/* Manhwa details */}
-        <Grid item xs={12} md={8}>
+        {/* Manhwa details - завжди справа */}
+        <Grid size={{ xs: 8, md: 8 }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

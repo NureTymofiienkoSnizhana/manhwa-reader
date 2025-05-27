@@ -5,12 +5,8 @@ import {
   Box,
   Paper,
   Grid,
-  Card,
-  CardContent,
-  CardActions,
   FormControl,
   FormControlLabel,
-  FormGroup,
   InputLabel,
   Select,
   MenuItem,
@@ -33,6 +29,9 @@ import {
   Slider,
   Chip,
   IconButton,
+  Card,
+  CardContent,
+  CardActions,
 } from '@mui/material';
 import {
   Palette as PaletteIcon,
@@ -52,18 +51,24 @@ import {
   VolumeUp as VolumeIcon,
   Speed as SpeedIcon,
   AutoAwesome as AutoAwesomeIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion } from 'framer-motion';
+import { useMutation, useQueryClient } from 'react-query';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const Settings = () => {
   const { t, i18n } = useTranslation();
   const { user, updateUser } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
   const { language, changeLanguage } = useLanguage();
+  const queryClient = useQueryClient();
   
   // Local state
   const [settings, setSettings] = useState({
@@ -95,9 +100,13 @@ const Settings = () => {
     cacheSize: 500, // MB
   });
   
+  // Dialog states
   const [openChangePassword, setOpenChangePassword] = useState(false);
+  const [openEditProfile, setOpenEditProfile] = useState(false);
   const [openDeleteAccount, setOpenDeleteAccount] = useState(false);
   const [openExportData, setOpenExportData] = useState(false);
+  
+  // Form states
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -105,7 +114,77 @@ const Settings = () => {
     showCurrentPassword: false,
     showNewPassword: false,
   });
+  
+  const [profileForm, setProfileForm] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+  });
+  
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // Mutations
+  const changePasswordMutation = useMutation(
+    (passwordData) => {
+      return axios.put(`${API_URL}/auth/change-password`, passwordData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+    },
+    {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: t('settings.passwordChanged'),
+          severity: 'success'
+        });
+        setOpenChangePassword(false);
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+          showCurrentPassword: false,
+          showNewPassword: false,
+        });
+      },
+      onError: (error) => {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.message || t('common.error'),
+          severity: 'error'
+        });
+      }
+    }
+  );
+
+  const updateProfileMutation = useMutation(
+    (profileData) => {
+      return axios.put(`${API_URL}/auth/update-profile`, profileData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+    },
+    {
+      onSuccess: (data) => {
+        updateUser(data.data.user);
+        queryClient.invalidateQueries('userProfile');
+        setSnackbar({
+          open: true,
+          message: t('settings.profileUpdated'),
+          severity: 'success'
+        });
+        setOpenEditProfile(false);
+      },
+      onError: (error) => {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.message || t('common.error'),
+          severity: 'error'
+        });
+      }
+    }
+  );
   
   // Handlers
   const handleSettingChange = (setting, value) => {
@@ -127,6 +206,43 @@ const Settings = () => {
       message: t('settings.settingSaved'),
       severity: 'success'
     });
+  };
+
+  const handleOpenEditProfile = () => {
+    setProfileForm({
+      username: user.username,
+      email: user.email,
+    });
+    setOpenEditProfile(true);
+  };
+
+  const handleProfileChange = (field) => (event) => {
+    setProfileForm(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+  };
+
+  const handleProfileSubmit = () => {
+    if (!profileForm.username.trim()) {
+      setSnackbar({
+        open: true,
+        message: t('auth.usernameRequired'),
+        severity: 'error'
+      });
+      return;
+    }
+
+    if (!profileForm.email.trim() || !/\S+@\S+\.\S+/.test(profileForm.email)) {
+      setSnackbar({
+        open: true,
+        message: t('auth.validEmail'),
+        severity: 'error'
+      });
+      return;
+    }
+
+    updateProfileMutation.mutate(profileForm);
   };
   
   const handlePasswordChange = (field) => (event) => {
@@ -155,25 +271,13 @@ const Settings = () => {
       return;
     }
     
-    // Here you would call the API to change password
-    setSnackbar({
-      open: true,
-      message: t('settings.passwordChanged'),
-      severity: 'success'
-    });
-    
-    setOpenChangePassword(false);
-    setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-      showCurrentPassword: false,
-      showNewPassword: false,
+    changePasswordMutation.mutate({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
     });
   };
   
   const handleExportData = () => {
-    // Mock export functionality
     const userData = {
       profile: user,
       settings: settings,
@@ -262,13 +366,13 @@ const Settings = () => {
             {t('nav.settings')}
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            Налаштуйте додаток під свої потреби
+            {t('settings.customizeApp')}
           </Typography>
         </Box>
         
         <Grid container spacing={4}>
           {/* Appearance Settings */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -277,7 +381,7 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <PaletteIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.appearance')}</Typography>
                   </Box>
@@ -339,7 +443,7 @@ const Settings = () => {
           </Grid>
           
           {/* Notification Settings */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -348,7 +452,7 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <NotificationsIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.notifications')}</Typography>
                   </Box>
@@ -399,7 +503,7 @@ const Settings = () => {
           </Grid>
           
           {/* Reading Settings */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -408,7 +512,7 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <SpeedIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.reading')}</Typography>
                   </Box>
@@ -469,7 +573,7 @@ const Settings = () => {
           </Grid>
           
           {/* Privacy Settings */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -478,7 +582,7 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <SecurityIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.privacy')}</Typography>
                   </Box>
@@ -535,7 +639,7 @@ const Settings = () => {
           </Grid>
           
           {/* Account Settings */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }} >
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -544,13 +648,24 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <AccountIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.account')}</Typography>
                   </Box>
                   
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        onClick={handleOpenEditProfile}
+                        startIcon={<EditIcon />}
+                      >
+                        {t('profile.editProfile')}
+                      </Button>
+                    </Grid>
+                    
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                       <Button
                         variant="outlined"
                         fullWidth
@@ -560,7 +675,7 @@ const Settings = () => {
                       </Button>
                     </Grid>
                     
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                       <Button
                         variant="outlined"
                         fullWidth
@@ -571,7 +686,7 @@ const Settings = () => {
                       </Button>
                     </Grid>
                     
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                       <Button
                         variant="outlined"
                         fullWidth
@@ -581,18 +696,6 @@ const Settings = () => {
                         {t('settings.resetSettings')}
                       </Button>
                     </Grid>
-                    
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        fullWidth
-                        onClick={() => setOpenDeleteAccount(true)}
-                        startIcon={<DeleteIcon />}
-                      >
-                        {t('settings.deleteAccount')}
-                      </Button>
-                    </Grid>
                   </Grid>
                 </CardContent>
               </Card>
@@ -600,7 +703,7 @@ const Settings = () => {
           </Grid>
           
           {/* Storage Settings */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }} >
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -609,13 +712,13 @@ const Settings = () => {
             >
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <StorageIcon color="primary" sx={{ mr: 2 }} />
                     <Typography variant="h6">{t('settings.storage')}</Typography>
                   </Box>
                   
                   <Grid container spacing={3} alignItems="center">
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <Box>
                         <Typography variant="body2" color="text.secondary" gutterBottom>
                           {t('settings.cacheUsage')}
@@ -632,8 +735,8 @@ const Settings = () => {
                         </Button>
                       </Box>
                     </Grid>
-                    
-                    <Grid item xs={12} md={4}>
+
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <FormControlLabel
                         control={
                           <Switch
@@ -647,8 +750,8 @@ const Settings = () => {
                         {t('settings.autoSyncDesc')}
                       </Typography>
                     </Grid>
-                    
-                    <Grid item xs={12} md={4}>
+
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Chip 
                           icon={<InfoIcon />}
@@ -671,13 +774,52 @@ const Settings = () => {
           </Grid>
         </Grid>
         
+        {/* Edit Profile Dialog */}
+        <Dialog open={openEditProfile} onClose={() => setOpenEditProfile(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>{t('profile.editProfile')}</DialogTitle>
+          <DialogContent>
+            <TextField
+              margin="dense"
+              label={t('auth.username')}
+              type="text"
+              fullWidth
+              variant="outlined"
+              value={profileForm.username}
+              onChange={handleProfileChange('username')}
+              sx={{ mb: 2 }}
+            />
+            
+            <TextField
+              margin="dense"
+              label={t('auth.email')}
+              type="email"
+              fullWidth
+              variant="outlined"
+              value={profileForm.email}
+              onChange={handleProfileChange('email')}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenEditProfile(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button 
+              onClick={handleProfileSubmit} 
+              variant="contained"
+              disabled={updateProfileMutation.isLoading}
+            >
+              {updateProfileMutation.isLoading ? t('common.loading') : t('common.save')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        
         {/* Change Password Dialog */}
         <Dialog open={openChangePassword} onClose={() => setOpenChangePassword(false)} maxWidth="sm" fullWidth>
           <DialogTitle>{t('settings.changePassword')}</DialogTitle>
           <DialogContent>
             <TextField
               margin="dense"
-              label={t('settings.currentPassword')}
+              label={t('auth.currentPassword')}
               type={passwordForm.showCurrentPassword ? 'text' : 'password'}
               fullWidth
               variant="outlined"
@@ -698,7 +840,7 @@ const Settings = () => {
             
             <TextField
               margin="dense"
-              label={t('settings.newPassword')}
+              label={t('auth.newPassword')}
               type={passwordForm.showNewPassword ? 'text' : 'password'}
               fullWidth
               variant="outlined"
@@ -731,8 +873,12 @@ const Settings = () => {
             <Button onClick={() => setOpenChangePassword(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handlePasswordSubmit} variant="contained">
-              {t('settings.changePassword')}
+            <Button 
+              onClick={handlePasswordSubmit} 
+              variant="contained"
+              disabled={changePasswordMutation.isLoading}
+            >
+              {changePasswordMutation.isLoading ? t('common.loading') : t('settings.changePassword')}
             </Button>
           </DialogActions>
         </Dialog>

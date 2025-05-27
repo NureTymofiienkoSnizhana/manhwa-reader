@@ -153,9 +153,104 @@ const updatePreferences = async (req, res, next) => {
   }
 };
 
+// Update user profile
+const updateProfile = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    const { username, email } = req.body;
+    const userId = req.user.id;
+    
+    // Check if username or email already exists (excluding current user)
+    const existingUser = await User.findOne({
+      $and: [
+        { _id: { $ne: userId } },
+        { $or: [{ email }, { username }] }
+      ]
+    });
+    
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      if (existingUser.username === username) {
+        return res.status(400).json({ message: 'Username already taken' });
+      }
+    }
+    
+    // Update user profile
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        username: username.trim(),
+        email: email.trim().toLowerCase()
+      },
+      { new: true }
+    );
+    
+    res.json({
+      user: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        level: updatedUser.level,
+        experience: updatedUser.experience,
+        language: updatedUser.language,
+        darkMode: updatedUser.darkMode
+      },
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Change password
+const changePassword = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+    
+    // Find user with password field
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Verify current password
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+    
+    // Update password (will be hashed by pre-save middleware)
+    user.password = newPassword;
+    await user.save();
+    
+    res.json({
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
-  updatePreferences
+  updatePreferences,
+  updateProfile,
+  changePassword
 };

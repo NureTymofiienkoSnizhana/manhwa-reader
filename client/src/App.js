@@ -87,6 +87,7 @@ function App() {
                     <Route path="browse" element={<Browse />} />
                     <Route path="manhwa/:manhwaId" element={<ManhwaDetails />} />
                     <Route path="read/:chapterId" element={<ChapterReader />} />
+                    <Route path="read/:manhwaId/chapter/:chapterId" element={<ChapterReader />} />
                     <Route path="search" element={<SearchResults />} />
                     <Route path="login" element={<Login />} />
                     <Route path="register" element={<Register />} />
