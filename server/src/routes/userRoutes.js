@@ -23,9 +23,4 @@ router.get('/profile/:userId', auth, getUserProfile);
 // @access  Private
 router.get('/reading-history', auth, getUserReadingHistory);
 
-// @route   PUT /api/users/role
-// @desc    Update user role (admin only)
-// @access  Private/Admin
-router.put('/role', [auth, checkRole(['admin'])], updateUserRole);
-
 module.exports = router;

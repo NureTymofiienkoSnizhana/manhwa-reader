@@ -26,6 +26,9 @@ import UploadManhwa from './pages/upload/UploadManhwa';
 import EditManhwa from './pages/upload/EditManhwa';
 import UploadChapter from './pages/upload/UploadChapter';
 import ManageChapters from './pages/upload/ManageChapters';
+import AdminBanManagement from './pages/admin/AdminBanManagement';
+import AdminStatistics from './pages/admin/AdminStatistics';
+import BannedScreen from './pages/banned/BannedScreen';
 
 // Import components
 import Layout from './components/layout/Layout';
@@ -92,6 +95,7 @@ function App() {
                     <Route path="login" element={<Login />} />
                     <Route path="register" element={<Register />} />
                     <Route path="unauthorized" element={<Unauthorized />} />
+                    <Route path="banned" element={<BannedScreen />} />
                     
                     {/* Protected routes for all authenticated users */}
                     <Route element={<ProtectedRoute />}>
@@ -107,6 +111,8 @@ function App() {
                       <Route path="admin" element={<AdminDashboard />} />
                       <Route path="admin/users" element={<AdminUsers />} />
                       <Route path="admin/level-tasks" element={<AdminLevelTasks />} />
+                      <Route path="admin/bans" element={<AdminBanManagement />} />
+                      <Route path="admin/statistics" element={<AdminStatistics />} />
                     </Route>
 
                     {/* Upload manhwa routes */}

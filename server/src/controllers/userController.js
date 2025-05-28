@@ -146,34 +146,7 @@ const getUserReadingHistory = async (req, res, next) => {
   }
 };
 
-// Update user role (admin only)
-const updateUserRole = async (req, res, next) => {
-  try {
-    const { userId, role } = req.body;
-    
-    // Check if valid role
-    if (!['reader', 'translator', 'admin'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { role },
-      { new: true }
-    ).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    res.json({ user });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   getUserProfile,
-  getUserReadingHistory,
-  updateUserRole
+  getUserReadingHistory
 };

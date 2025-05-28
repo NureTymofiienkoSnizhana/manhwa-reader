@@ -616,7 +616,7 @@ const MyLibrary = () => {
         <Paper sx={{ p: 3, mb: 4, borderRadius: 3 }}>
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <TextField
-              placeholder={t('library.searchInLibrary')}
+              placeholder={t('library.searchInLibrary')} 
               value={searchQuery}
               onChange={handleSearchChange}
               size="small"

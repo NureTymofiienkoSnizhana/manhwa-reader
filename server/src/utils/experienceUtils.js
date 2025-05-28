@@ -5,7 +5,9 @@ const EXP_REWARDS = {
     RATE_MANHWA: 5,
     CREATE_CATEGORY: 10,
     ADD_TO_CATEGORY: 2,
-    COMPLETE_TASK: 100
+    COMPLETE_TASK: 100,
+    WRITE_COMMENT: 5,
+    WRITE_REPLY: 2
   };
   
   // Calculate level based on experience

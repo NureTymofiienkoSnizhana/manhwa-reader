@@ -10,9 +10,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userBan, setUserBan] = useState(null);
+
   const navigate = useNavigate();
   
-  // Initialize user from localStorage
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('token');
@@ -20,12 +21,14 @@ export const AuthProvider = ({ children }) => {
       
       if (token && storedUser) {
         try {
-          // Verify token by fetching current user
           const { user } = await getCurrentUser();
           setUser(user);
+
+          if (userBan) {
+          setUserBan(userBan);
+          }
         } catch (error) {
           console.error('Failed to authenticate token:', error);
-          // Clear invalid token
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
@@ -94,7 +97,8 @@ export const AuthProvider = ({ children }) => {
       registerUser, 
       logout,
       updateUser,
-      isAuthenticated: !!user
+      isAuthenticated: !!user,
+      userBan
     }}>
       {children}
     </AuthContext.Provider>

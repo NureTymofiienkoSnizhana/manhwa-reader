@@ -4,32 +4,115 @@ const LevelTask = require('../models/LevelTask');
 // Get all users (admin only)
 const getAllUsers = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-    const search = req.query.search || '';
+    const { page = 1, limit = 10, role } = req.query;
     
-    // Create search query
-    const searchQuery = search ? {
-      $or: [
-        { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ]
-    } : {};
+    const query = {};
+    if (role) {
+      query.role = role;
+    }
     
-    const total = await User.countDocuments(searchQuery);
-    const users = await User.find(searchQuery)
-      .select('-password')
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const users = await User.find(query)
+      .select('username email role level experience profilePic createdAt')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(parseInt(limit));
+    
+    const total = await User.countDocuments(query);
     
     res.json({
       users,
       pagination: {
         total,
-        page,
-        pages: Math.ceil(total / limit)
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Search users by username or email (admin only)
+const searchUsers = async (req, res, next) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || query.length < 3) {
+      return res.status(400).json({ message: 'Search query must be at least 3 characters' });
+    }
+    
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } }
+      ]
+    })
+    .select('username email role level experience profilePic createdAt')
+    .limit(20);
+    
+    res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete user (admin only)
+const deleteUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Cannot delete administrator account' });
+    }
+    
+    await User.findByIdAndDelete(userId);
+    
+    await ManhwaProgress.deleteMany({ user: userId });
+    await Comment.deleteMany({ user: userId });
+    await Category.deleteMany({ user: userId });
+    
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update user role (admin only)
+const updateUserRole = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    const { userId, role } = req.body;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.role === 'admin' && role !== 'admin' && user.id !== req.user.id) {
+      return res.status(403).json({ message: 'Cannot change role of another administrator' });
+    }
+    
+    user.role = role;
+    await user.save();
+    
+    res.json({ 
+      message: 'User role updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -53,16 +136,13 @@ const updateLevelTask = async (req, res, next) => {
     const { level } = req.params;
     const { description, requirements, reward } = req.body;
     
-    // Find existing task or create new
     let task = await LevelTask.findOne({ level: parseInt(level) });
     
     if (task) {
-      // Update existing task
       task.description = description;
       task.requirements = requirements;
       task.reward = reward;
     } else {
-      // Create new task
       task = new LevelTask({
         level: parseInt(level),
         description,
@@ -100,5 +180,8 @@ module.exports = {
   getAllUsers,
   getLevelTasks,
   updateLevelTask,
-  deleteLevelTask
+  deleteLevelTask,
+  updateUserRole,
+  searchUsers,
+  deleteUser
 };

@@ -36,6 +36,7 @@ import {
   AccessTime as AccessTimeIcon,
   Share as ShareIcon,
   MoreVert as MoreVertIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -46,6 +47,8 @@ import { useNotification } from '../../hooks/useNotification';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import CategorySelector from '../../components/common/CategorySelector';
+import Comments from '../../components/common/Comments';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -64,6 +67,7 @@ const ManhwaDetails = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
+  const [openCategorySelector, setOpenCategorySelector] = useState(false);
   const [isAddingToLibrary, setIsAddingToLibrary] = useState(false);
   
   // Визначаємо, чи це користувацька манга чи зовнішня
@@ -250,6 +254,20 @@ const ManhwaDetails = () => {
       status: 'completed'
     });
   };
+
+  // Open category selector
+  const handleOpenCategorySelector = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    setOpenCategorySelector(true);
+  };
+
+  // Close category selector
+  const handleCloseCategorySelector = () => {
+    setOpenCategorySelector(false);
+  };
   
   // Format publication date
   const formatDate = (dateString) => {
@@ -408,6 +426,17 @@ const ManhwaDetails = () => {
                     </Menu>
                   </>
                 )}
+
+                {/* Add to Categories button - для всіх типів манхв */}
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  onClick={handleOpenCategorySelector}
+                  startIcon={<CategoryIcon />}
+                  color="secondary"
+                >
+                  {t('categories.addToCategory')}
+                </Button>
                 
                 {isUserManga && isAuthor && (
                   <Button
@@ -442,7 +471,7 @@ const ManhwaDetails = () => {
           </motion.div>
         </Grid>
         
-        {/* Manhwa details - завжди справа */}
+        {/* Manhwa details */}
         <Grid size={{ xs: 8, md: 8 }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -521,10 +550,10 @@ const ManhwaDetails = () => {
             <Divider sx={{ mb: 3 }} />
             
             <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
-              <Tab label={t('common.about')} />
-              <Tab label={t('manhwa.chapters')} />
-              {userProgress?.review && <Tab label={t('manhwa.yourReview')} />}
-            </Tabs>
+            <Tab label={t('common.about')} />
+            <Tab label={t('manhwa.chapters')} />
+            <Tab label={t('common.comments')} /> 
+          </Tabs>
             
             {/* About Tab */}
             {activeTab === 0 && (
@@ -592,21 +621,13 @@ const ManhwaDetails = () => {
                     {t('manhwa.noChapters')}
                   </Typography>
                 )}
-                
-                {/* Додаткова кнопка для авторів користувацьких манг */}
-                {isUserManga && isAuthor && (
-                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      component={RouterLink}
-                      to={`/upload/chapter/${manhwaId}`}
-                      startIcon={<CreateIcon />}
-                    >
-                      {t('upload.addChapter')}
-                    </Button>
-                  </Box>
-                )}
+              </Box>
+            )}
+            
+            {/* Comments Tab */}
+            {activeTab === 2 && (
+              <Box sx={{ mt: 2 }}>
+                <Comments manhwaId={manhwaId} />
               </Box>
             )}
             
@@ -658,6 +679,16 @@ const ManhwaDetails = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Category Selector Dialog */}
+      <CategorySelector
+        open={openCategorySelector}
+        onClose={handleCloseCategorySelector}
+        manhwaId={manhwaId}
+        manhwaTitle={manga?.title}
+        manhwaCover={manga?.coverImage}
+        isUserManhwa={isUserManga}
+      />
     </Container>
   );
 };

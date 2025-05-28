@@ -45,7 +45,6 @@ const UserSchema = new mongoose.Schema({
     default: false
   },
   
-  // Ban system fields
   isBanned: {
     type: Boolean,
     default: false
@@ -62,19 +61,17 @@ const UserSchema = new mongoose.Schema({
     ref: 'User'
   },
   banExpiresAt: {
-    type: Date // null means permanent ban
+    type: Date 
   },
   
-  // Profile fields
   profilePicture: {
-    type: String // URL to profile picture
+    type: String 
   },
   bio: {
     type: String,
     maxlength: 500
   },
   
-  // Statistics
   totalManhwasRead: {
     type: Number,
     default: 0

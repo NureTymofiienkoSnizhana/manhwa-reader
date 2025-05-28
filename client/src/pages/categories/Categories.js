@@ -166,14 +166,15 @@ const Categories = () => {
   };
   
   const handleOpenEditDialog = (category) => {
-    setSelectedCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description || ''
-    });
-    setOpenEditDialog(true);
-    handleCloseMenu();
-  };
+  setSelectedCategory(category);
+  setFormData({
+    name: category.name,
+    description: category.description || ''
+  });
+  setOpenEditDialog(true);
+  
+  setMenuAnchor(null);
+};
   
   const handleCloseEditDialog = () => {
     setOpenEditDialog(false);
@@ -182,10 +183,11 @@ const Categories = () => {
   };
   
   const handleOpenDeleteDialog = (category) => {
-    setSelectedCategory(category);
-    setOpenDeleteDialog(true);
-    handleCloseMenu();
-  };
+  setSelectedCategory(category);
+  setOpenDeleteDialog(true);
+  
+  setMenuAnchor(null);
+};
   
   const handleCloseDeleteDialog = () => {
     setOpenDeleteDialog(false);
@@ -198,9 +200,12 @@ const Categories = () => {
   };
   
   const handleCloseMenu = () => {
-    setMenuAnchor(null);
+  setMenuAnchor(null);
+  
+  if (!openEditDialog && !openDeleteDialog) {
     setSelectedCategory(null);
-  };
+  }
+};
   
   const handleFormChange = (field) => (event) => {
     setFormData(prev => ({
@@ -223,20 +228,29 @@ const Categories = () => {
   };
   
   const handleUpdateSubmit = () => {
-    if (!formData.name.trim()) {
-      setSnackbar({
-        open: true,
-        message: t('categories.nameRequired'),
-        severity: 'error'
-      });
-      return;
-    }
-    
-    updateCategoryMutation.mutate({
-      categoryId: selectedCategory._id,
-      categoryData: formData
+  if (!formData.name.trim()) {
+    setSnackbar({
+      open: true,
+      message: t('categories.nameRequired'),
+      severity: 'error'
     });
-  };
+    return;
+  }
+  
+  if (!selectedCategory) {
+    setSnackbar({
+      open: true,
+      message: 'Error: Category not selected',
+      severity: 'error'
+    });
+    return;
+  }
+  
+  updateCategoryMutation.mutate({
+    categoryId: selectedCategory._id,
+    categoryData: formData
+  });
+};
   
   const handleDeleteSubmit = () => {
     if (selectedCategory) {
@@ -400,27 +414,6 @@ const Categories = () => {
                         >
                           {category.description}
                         </Typography>
-                      )}
-                      
-                      {/* Preview manhwas */}
-                      {category.manhwas && category.manhwas.length > 0 && (
-                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {category.manhwas.slice(0, 3).map((manhwa, index) => (
-                            <Chip
-                              key={index}
-                              label={manhwa.title}
-                              size="small"
-                              variant="outlined"
-                            />
-                          ))}
-                          {category.manhwas.length > 3 && (
-                            <Chip
-                              label={`+${category.manhwas.length - 3}`}
-                              size="small"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
                       )}
                     </CardContent>
                     

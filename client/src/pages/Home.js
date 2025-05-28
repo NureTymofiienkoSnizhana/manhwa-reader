@@ -155,51 +155,6 @@ const Home = () => {
         </Box>
       </Box>
       
-      {/* Секція для перекладачів */}
-      {isTranslatorOrAdmin && (
-        <Box sx={{ mb: 6 }}>
-          <Paper 
-            sx={{ 
-              p: 4, 
-              textAlign: 'center', 
-              borderRadius: 2,
-              background: 'linear-gradient(to right, rgba(112, 71, 235, 0.1), rgba(255, 107, 107, 0.1))'
-            }}
-            component={motion.div}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-              Translator's Corner
-            </Typography>
-            <Typography variant="body1" paragraph>
-              Welcome to the Translator's Corner! You can upload new manhwas or manage your existing works.
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                component={RouterLink}
-                to="/upload/dashboard"
-                startIcon={<DashboardIcon />}
-              >
-                Upload Dashboard
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                component={RouterLink}
-                to="/upload/new"
-                startIcon={<AddIcon />}
-              >
-                Create New Manhwa
-              </Button>
-            </Box>
-          </Paper>
-        </Box>
-      )}
-      
       {/* Content Tabs */}
       <Paper elevation={0} sx={{ mb: 4, bgcolor: 'background.default' }}>
         <Tabs
@@ -412,51 +367,6 @@ const Home = () => {
           </motion.div>
         )}
       </Box>
-      
-      {/* Секція заохочення для перекладачів внизу */}
-      {isTranslatorOrAdmin && (
-        <Box sx={{ mb: 6 }}>
-          <Paper 
-            sx={{ 
-              p: 4, 
-              textAlign: 'center', 
-              borderRadius: 2,
-              background: 'linear-gradient(to right, rgba(112, 71, 235, 0.1), rgba(255, 107, 107, 0.1))'
-            }}
-            component={motion.div}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-              Translator's Corner
-            </Typography>
-            <Typography variant="body1" paragraph>
-              Welcome to the Translator's Corner! You can upload new manhwas or manage your existing works.
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                component={RouterLink}
-                to="/upload/dashboard"
-                startIcon={<DashboardIcon />}
-              >
-                Upload Dashboard
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                component={RouterLink}
-                to="/upload/new"
-                startIcon={<AddIcon />}
-              >
-                Create New Manhwa
-              </Button>
-            </Box>
-          </Paper>
-        </Box>
-      )}
     </Container>
   );
 };

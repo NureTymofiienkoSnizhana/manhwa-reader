@@ -17,6 +17,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userManhwaRoutes = require('./routes/userManhwaRoutes.js');
+const commentRoutes = require('./routes/commentRoutes');
+const checkBan = require('./middleware/checkBan');
 
 // Load config
 const config = require('./config/config');
@@ -38,6 +40,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(compression());
 app.use(morgan('dev'));
+app.use(checkBan);
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -55,6 +58,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user-manhwa', userManhwaRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use('/uploads', express.static('public/uploads'));
 app.use('/public', express.static('public'));
