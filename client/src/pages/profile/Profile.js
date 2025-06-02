@@ -110,20 +110,10 @@ const Profile = () => {
   
   // Форматування дати реєстрації
   const formatMemberSince = (dateString) => {
-    if (!dateString) return t('common.unknown');
-    
     try {
-      const date = new Date(dateString);
-      const formatted = format(date, 'MMMM yyyy', { locale: dateLocale });
-      const timeAgo = formatDistanceToNow(date, { 
-        addSuffix: true, 
-        locale: dateLocale 
-      });
-      
-      return `${formatted} (${timeAgo})`;
+      return format(new Date(dateString), 'PPP');
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return t('common.unknown');
+      return 'Unknown date';
     }
   };
     

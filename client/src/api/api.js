@@ -24,7 +24,7 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle token expiration
+// Add a response interceptor to handle token expiration and ban
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -35,6 +35,21 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    
+    // Handle 403 (Forbidden) responses with ban information
+    if (error.response && error.response.status === 403 && error.response.data.ban) {
+      console.log('API interceptor detected ban:', error.response.data.ban);
+      
+      // Store ban information
+      localStorage.setItem('userBan', JSON.stringify(error.response.data.ban));
+      
+      // Check if we're already on the banned page
+      if (!window.location.pathname.includes('/banned')) {
+        // Redirect to banned page
+        window.location.href = '/banned';
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

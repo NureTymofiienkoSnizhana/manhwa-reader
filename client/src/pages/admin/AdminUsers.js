@@ -45,7 +45,8 @@ import {
   getUsers, 
   searchUsers, 
   updateUserRole, 
-  deleteUser 
+  deleteUser,
+  banUser
 } from '../../api/adminService';
 import { format } from 'date-fns';
 
@@ -60,8 +61,13 @@ const AdminUsers = () => {
   const [filterRole, setFilterRole] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newRole, setNewRole] = useState('');
+  const [banForm, setBanForm] = useState({
+    reason: '',
+    banDuration: '1d'
+  });
   
   // Queries & Mutations
   const { 
@@ -94,6 +100,11 @@ const AdminUsers = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('adminUsers');
         setEditDialogOpen(false);
+        setSelectedUser(null);
+      },
+      onError: (error) => {
+        console.error('Failed to update role:', error);
+        alert(error.message || 'Failed to update user role');
       }
     }
   );
@@ -104,6 +115,27 @@ const AdminUsers = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('adminUsers');
         setDeleteDialogOpen(false);
+        setSelectedUser(null);
+      },
+      onError: (error) => {
+        console.error('Failed to delete user:', error);
+        alert(error.message || 'Failed to delete user');
+      }
+    }
+  );
+  
+  const banUserMutation = useMutation(
+    (data) => banUser(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('adminUsers');
+        setBanDialogOpen(false);
+        resetBanForm();
+        setSelectedUser(null);
+      },
+      onError: (error) => {
+        console.error('Failed to ban user:', error);
+        alert(error.message || 'Failed to ban user');
       }
     }
   );
@@ -128,19 +160,63 @@ const AdminUsers = () => {
   };
   
   const handleEditUser = (user) => {
-    setSelectedUser(user);
+    console.log("Edit user data:", user);
+    setSelectedUser({
+      ...user,
+      id: user._id // Ensure we're using the correct MongoDB _id field
+    });
     setNewRole(user.role);
     setEditDialogOpen(true);
   };
   
   const handleDeleteUser = (user) => {
-    setSelectedUser(user);
+    console.log("Delete user data:", user);
+    setSelectedUser({
+      ...user,
+      id: user._id 
+    });
     setDeleteDialogOpen(true);
+  };
+  
+  const handleBanUser = (user) => {
+    console.log("Ban user data:", user);
+    setSelectedUser({
+      ...user,
+      id: user._id 
+    });
+    resetBanForm();
+    setBanDialogOpen(true);
+  };
+  
+  const resetBanForm = () => {
+    setBanForm({
+      reason: '',
+      banDuration: '1d'
+    });
+  };
+  
+  const handleBanFormChange = (field) => (event) => {
+    setBanForm(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+  };
+  
+  const handleBanSubmit = () => {
+    if (!selectedUser || !banForm.reason || !banForm.banDuration) return;
+    
+    console.log("Submitting ban for user:", selectedUser);
+    banUserMutation.mutate({
+      userId: selectedUser.id,
+      reason: banForm.reason,
+      banDuration: banForm.banDuration
+    });
   };
   
   const handleUpdateRole = () => {
     if (!selectedUser || !newRole) return;
     
+    console.log("Updating role for user:", selectedUser);
     updateRoleMutation.mutate({
       userId: selectedUser.id,
       role: newRole
@@ -149,12 +225,8 @@ const AdminUsers = () => {
   
   const handleConfirmDelete = () => {
     if (!selectedUser) return;
+    console.log("Confirming delete for user:", selectedUser);
     deleteUserMutation.mutate(selectedUser.id);
-  };
-  
-  const handleBanUser = (user) => {
-    // Navigate to ban management page with user pre-selected
-    window.location.href = `/admin/bans?userId=${user.id}`;
   };
   
   const formatDate = (dateString) => {
@@ -184,7 +256,7 @@ const AdminUsers = () => {
         {/* Search and filters */}
         <Paper sx={{ p: 2, mb: 3 }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 placeholder={t('admin.searchUsers')}
@@ -206,8 +278,8 @@ const AdminUsers = () => {
                 }}
               />
             </Grid>
-            
-            <Grid item xs={12} md={3}>
+
+            <Grid size={{ xs: 12, md: 3 }}>
               <FormControl fullWidth>
                 <InputLabel>{t('admin.filterByRole')}</InputLabel>
                 <Select
@@ -227,8 +299,8 @@ const AdminUsers = () => {
                 </Select>
               </FormControl>
             </Grid>
-            
-            <Grid item xs={12} md={3}>
+
+            <Grid size={{ xs: 12, md: 3 }}>
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
@@ -266,7 +338,7 @@ const AdminUsers = () => {
                 </TableHead>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user._id}>
                       <TableCell component="th" scope="row">
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Avatar 
@@ -302,7 +374,6 @@ const AdminUsers = () => {
                           <Tooltip title={t('admin.editRole')}>
                             <IconButton 
                               onClick={() => handleEditUser(user)}
-                              disabled={user.role === 'admin' && user.id !== selectedUser?.id}
                               color="primary"
                             >
                               <EditIcon />
@@ -433,6 +504,73 @@ const AdminUsers = () => {
             disabled={deleteUserMutation.isLoading}
           >
             {deleteUserMutation.isLoading ? t('common.loading') : t('common.delete')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Ban User Dialog */}
+      <Dialog open={banDialogOpen} onClose={() => setBanDialogOpen(false)}>
+        <DialogTitle>{t('admin.banUser')}</DialogTitle>
+        <DialogContent>
+          {selectedUser && (
+            <Box sx={{ pt: 1, minWidth: '400px' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Avatar 
+                  src={selectedUser.profilePic} 
+                  alt={selectedUser.username}
+                  sx={{ width: 50, height: 50, mr: 2 }}
+                >
+                  {selectedUser.username?.charAt(0).toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">{selectedUser.username}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedUser.email}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <TextField
+                  label={t('admin.banReason')}
+                  value={banForm.reason}
+                  onChange={handleBanFormChange('reason')}
+                  multiline
+                  rows={3}
+                  required
+                  error={banUserMutation.isError}
+                  helperText={banUserMutation.error?.message}
+                />
+              </FormControl>
+              
+              <FormControl fullWidth>
+                <InputLabel>{t('admin.banDuration')}</InputLabel>
+                <Select
+                  value={banForm.banDuration}
+                  onChange={handleBanFormChange('banDuration')}
+                  label={t('admin.banDuration')}
+                >
+                  <MenuItem value="1d">{t('admin.banDuration1Day')}</MenuItem>
+                  <MenuItem value="3d">{t('admin.banDuration3Days')}</MenuItem>
+                  <MenuItem value="7d">{t('admin.banDuration1Week')}</MenuItem>
+                  <MenuItem value="30d">{t('admin.banDuration30Days')}</MenuItem>
+                  <MenuItem value="permanent">{t('admin.banDurationPermanent')}</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBanDialogOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            onClick={handleBanSubmit}
+            variant="contained"
+            color="error"
+            disabled={!banForm.reason || banUserMutation.isLoading}
+          >
+            {banUserMutation.isLoading ? t('common.loading') : t('admin.banUser')}
           </Button>
         </DialogActions>
       </Dialog>

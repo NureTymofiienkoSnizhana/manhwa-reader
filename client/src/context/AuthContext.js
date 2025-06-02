@@ -21,16 +21,29 @@ export const AuthProvider = ({ children }) => {
       
       if (token && storedUser) {
         try {
-          const { user } = await getCurrentUser();
-          setUser(user);
-
-          if (userBan) {
-          setUserBan(userBan);
+          const response = await getCurrentUser();
+          setUser(response.user);
+          
+          if (response.userBan) {
+            console.log('User is banned:', response.userBan);
+            setUserBan(response.userBan);
+            navigate('/banned'); 
+          } else {
+            setUserBan(null);
           }
         } catch (error) {
           console.error('Failed to authenticate token:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          
+          if (error.response && error.response.status === 403 && error.response.data.ban) {
+            console.log('User is banned (from error):', error.response.data.ban);
+            setUserBan(error.response.data.ban);
+            navigate('/banned');
+          } else {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+            setUserBan(null);
+          }
         }
       }
       
@@ -38,16 +51,32 @@ export const AuthProvider = ({ children }) => {
     };
     
     initializeAuth();
-  }, []);
+  }, [navigate]);
   
   // Login function
   const loginUser = async (credentials) => {
     try {
       setError(null);
       const data = await login(credentials);
+      
+      if (data.userBan) {
+        console.log('User is banned during login:', data.userBan);
+        setUserBan(data.userBan);
+        setUser(data.user);
+        navigate('/banned');
+        return data;
+      }
+      
       setUser(data.user);
+      setUserBan(null);
       return data;
     } catch (error) {
+      if (error.response && error.response.status === 403 && error.response.data.ban) {
+        console.log('User is banned (login error):', error.response.data.ban);
+        setUserBan(error.response.data.ban);
+        navigate('/banned');
+      }
+      
       setError(error.message || 'Login failed');
       throw error;
     }
@@ -59,6 +88,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const data = await register(userData);
       setUser(data.user);
+      setUserBan(null);
       return data;
     } catch (error) {
       setError(error.message || 'Registration failed');
@@ -70,6 +100,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     logoutService();
     setUser(null);
+    setUserBan(null);
     navigate('/login');
   };
   
@@ -87,6 +118,35 @@ export const AuthProvider = ({ children }) => {
       ...userData
     }));
   };
+
+  // Check ban status regularly (every 60 seconds)
+  useEffect(() => {
+    let interval;
+    
+    if (user && !userBan) {
+      interval = setInterval(async () => {
+        try {
+          const response = await getCurrentUser();
+          
+          if (response.userBan) {
+            console.log('User ban detected during interval check:', response.userBan);
+            setUserBan(response.userBan);
+            navigate('/banned');
+          }
+        } catch (error) {
+          if (error.response && error.response.status === 403 && error.response.data.ban) {
+            console.log('User ban detected during interval check (error):', error.response.data.ban);
+            setUserBan(error.response.data.ban);
+            navigate('/banned');
+          }
+        }
+      }, 60000); 
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [user, userBan, navigate]);
   
   return (
     <AuthContext.Provider value={{ 

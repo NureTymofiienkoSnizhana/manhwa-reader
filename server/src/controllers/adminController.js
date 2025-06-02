@@ -1,5 +1,10 @@
 const User = require('../models/User');
 const LevelTask = require('../models/LevelTask');
+const ManhwaProgress = require('../models/ManhwaProgress');
+const Comment = require('../models/Comment');
+const Category = require('../models/Category');
+const { validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 
 // Get all users (admin only)
 const getAllUsers = async (req, res, next) => {
@@ -30,6 +35,7 @@ const getAllUsers = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('Error in getAllUsers:', error);
     next(error);
   }
 };
@@ -54,6 +60,7 @@ const searchUsers = async (req, res, next) => {
     
     res.json({ users });
   } catch (error) {
+    console.error('Error in searchUsers:', error);
     next(error);
   }
 };
@@ -63,6 +70,12 @@ const deleteUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
     
+    console.log('Deleting user with ID:', userId);
+    
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -74,12 +87,14 @@ const deleteUser = async (req, res, next) => {
     
     await User.findByIdAndDelete(userId);
     
+    // Delete related data
     await ManhwaProgress.deleteMany({ user: userId });
     await Comment.deleteMany({ user: userId });
     await Category.deleteMany({ user: userId });
     
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    console.error('Error in deleteUser:', error);
     next(error);
   }
 };
@@ -94,12 +109,18 @@ const updateUserRole = async (req, res, next) => {
     
     const { userId, role } = req.body;
     
+    console.log('Updating user role:', { userId, role });
+    
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    if (user.role === 'admin' && role !== 'admin' && user.id !== req.user.id) {
+    if (user.role === 'admin' && role !== 'admin' && user._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Cannot change role of another administrator' });
     }
     
@@ -116,6 +137,7 @@ const updateUserRole = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('Error in updateUserRole:', error);
     next(error);
   }
 };
@@ -126,6 +148,7 @@ const getLevelTasks = async (req, res, next) => {
     const tasks = await LevelTask.find().sort({ level: 1 });
     res.json({ tasks });
   } catch (error) {
+    console.error('Error in getLevelTasks:', error);
     next(error);
   }
 };
@@ -155,6 +178,7 @@ const updateLevelTask = async (req, res, next) => {
     
     res.json({ task });
   } catch (error) {
+    console.error('Error in updateLevelTask:', error);
     next(error);
   }
 };
@@ -172,6 +196,7 @@ const deleteLevelTask = async (req, res, next) => {
     
     res.json({ message: 'Level task deleted successfully' });
   } catch (error) {
+    console.error('Error in deleteLevelTask:', error);
     next(error);
   }
 };

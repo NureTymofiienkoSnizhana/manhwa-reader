@@ -70,7 +70,10 @@ const AdminBanManagement = () => {
     data: activeBansData, 
     isLoading: activeBansLoading 
   } = useQuery('activeBans', getActiveBans, {
-    enabled: activeTab === 0
+    enabled: activeTab === 0,
+    onError: (error) => {
+      console.error("Error fetching active bans:", error);
+    }
   });
   
   // Отримання історії банів
@@ -78,16 +81,9 @@ const AdminBanManagement = () => {
     data: banHistoryData, 
     isLoading: banHistoryLoading 
   } = useQuery('banHistory', getBanHistory, {
-    enabled: activeTab === 1
-  });
-  
-  // Мутація для бану користувача
-  const banUserMutation = useMutation(banUser, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('activeBans');
-      queryClient.invalidateQueries('banHistory');
-      setBanDialogOpen(false);
-      resetBanForm();
+    enabled: activeTab === 1,
+    onError: (error) => {
+      console.error("Error fetching ban history:", error);
     }
   });
   
@@ -96,6 +92,9 @@ const AdminBanManagement = () => {
     onSuccess: () => {
       queryClient.invalidateQueries('activeBans');
       queryClient.invalidateQueries('banHistory');
+    },
+    onError: (error) => {
+      console.error("Error unbanning user:", error);
     }
   });
   
@@ -104,94 +103,44 @@ const AdminBanManagement = () => {
     setActiveTab(newValue);
   };
   
-  // Відкрити діалог бану
-  const handleOpenBanDialog = (user = null) => {
-    setSelectedUser(user);
-    setBanDialogOpen(true);
-  };
-  
-  // Закрити діалог бану
-  const handleCloseBanDialog = () => {
-    setBanDialogOpen(false);
-    resetBanForm();
-  };
-  
-  // Скинути форму бану
-  const resetBanForm = () => {
-    setBanForm({
-      reason: '',
-      banDuration: '1d'
-    });
-    setSelectedUser(null);
-    setSearchTerm('');
-    setSearchResults([]);
-  };
-  
-  // Змінити форму бану
-  const handleBanFormChange = (field) => (event) => {
-    setBanForm(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-  };
-  
-  // Відправити форму бану
-  const handleBanSubmit = () => {
-    if (!selectedUser || !banForm.reason || !banForm.banDuration) {
-      return;
-    }
-    
-    banUserMutation.mutate({
-      userId: selectedUser.id,
-      reason: banForm.reason,
-      banDuration: banForm.banDuration
-    });
-  };
-  
   // Розбан користувача
   const handleUnban = (userId) => {
-    unbanUserMutation.mutate(userId);
-  };
-  
-  // Пошук користувачів
-  const handleSearchUsers = async () => {
-    if (searchTerm.trim().length < 2) return;
-    
-    try {
-      const data = await searchUsers(searchTerm);
-      setSearchResults(data.users);
-    } catch (error) {
-      console.error('Error searching users:', error);
-      setSearchResults([]);
+    if (!userId) {
+      console.error("Cannot unban user: userId is undefined");
+      return;
     }
-  };
-  
-  // Обробка вибору користувача з результатів пошуку
-  const handleSelectUser = (user) => {
-    setSelectedUser(user);
-    setSearchTerm('');
-    setSearchResults([]);
+    unbanUserMutation.mutate(userId);
   };
   
   // Форматування дати
   const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    
     try {
       return format(new Date(dateString), 'PPP p');
     } catch (error) {
-      return 'Unknown date';
+      console.error("Error formatting date:", error);
+      return 'Invalid date';
     }
   };
   
-  // Отримання тексту для тривалості бану
-  const getBanDurationText = (duration) => {
-    switch(duration) {
-      case '1d': return '1 day';
-      case '3d': return '3 days';
-      case '7d': return '1 week';
-      case '30d': return '30 days';
-      case 'permanent': return 'Permanent';
-      default: return duration;
-    }
+  // Безпечне отримання першої літери імені користувача
+  const getUserInitial = (user) => {
+    if (!user) return '?';
+    if (!user.username) return '?';
+    return user.username.charAt(0).toUpperCase();
+  };
+  
+  // Функція для безпечного відображення імені користувача
+  const getUserDisplayName = (user) => {
+    if (!user) return 'Unknown user';
+    return user.username || 'Unnamed user';
+  };
+  
+  // Безпечне відображення email
+  const getUserEmail = (user) => {
+    if (!user) return '';
+    return user.email || '';
   };
   
   return (
@@ -200,17 +149,6 @@ const AdminBanManagement = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           {t('admin.banManagement')}
         </Typography>
-        
-        <Box sx={{ mb: 4 }}>
-          <Button
-            variant="contained"
-            startIcon={<Block />}
-            onClick={() => handleOpenBanDialog()}
-            color="error"
-          >
-            {t('admin.banUser')}
-          </Button>
-        </Box>
         
         <Paper sx={{ mb: 4 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
@@ -244,26 +182,25 @@ const AdminBanManagement = () => {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                               <Avatar 
-                                src={ban.user.profilePic} 
                                 sx={{ mr: 1, width: 32, height: 32 }}
                               >
-                                {ban.user.username.charAt(0).toUpperCase()}
+                                {getUserInitial(ban.user)}
                               </Avatar>
                               <Box>
                                 <Typography variant="body2" fontWeight="bold">
-                                  {ban.user.username}
+                                  {getUserDisplayName(ban.user)}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                  {ban.user.email}
+                                  {getUserEmail(ban.user)}
                                 </Typography>
                               </Box>
                             </Box>
                           </TableCell>
-                          <TableCell>{ban.reason}</TableCell>
-                          <TableCell>{ban.bannedBy.username}</TableCell>
+                          <TableCell>{ban.reason || '-'}</TableCell>
+                          <TableCell>{ban.bannedBy ? ban.bannedBy.username : 'System'}</TableCell>
                           <TableCell>{formatDate(ban.createdAt)}</TableCell>
                           <TableCell>
-                            {new Date(ban.bannedUntil).getFullYear() > 2050 
+                            {ban.bannedUntil && new Date(ban.bannedUntil).getFullYear() > 2050 
                               ? 'Permanent' 
                               : formatDate(ban.bannedUntil)
                             }
@@ -272,7 +209,8 @@ const AdminBanManagement = () => {
                             <Tooltip title={t('admin.unban')}>
                               <IconButton 
                                 color="primary"
-                                onClick={() => handleUnban(ban.user._id)}
+                                onClick={() => handleUnban(ban.user?._id)}
+                                disabled={!ban.user?._id}
                               >
                                 <RestoreFromTrash />
                               </IconButton>
@@ -317,26 +255,25 @@ const AdminBanManagement = () => {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                               <Avatar 
-                                src={ban.user.profilePic} 
                                 sx={{ mr: 1, width: 32, height: 32 }}
                               >
-                                {ban.user.username.charAt(0).toUpperCase()}
+                                {getUserInitial(ban.user)}
                               </Avatar>
                               <Box>
                                 <Typography variant="body2" fontWeight="bold">
-                                  {ban.user.username}
+                                  {getUserDisplayName(ban.user)}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                  {ban.user.email}
+                                  {getUserEmail(ban.user)}
                                 </Typography>
                               </Box>
                             </Box>
                           </TableCell>
-                          <TableCell>{ban.reason}</TableCell>
-                          <TableCell>{ban.bannedBy.username}</TableCell>
+                          <TableCell>{ban.reason || '-'}</TableCell>
+                          <TableCell>{ban.bannedBy ? ban.bannedBy.username : 'System'}</TableCell>
                           <TableCell>{formatDate(ban.createdAt)}</TableCell>
                           <TableCell>
-                            {new Date(ban.bannedUntil).getFullYear() > 2050 
+                            {ban.bannedUntil && new Date(ban.bannedUntil).getFullYear() > 2050 
                               ? 'Permanent' 
                               : formatDate(ban.bannedUntil)
                             }
@@ -370,159 +307,6 @@ const AdminBanManagement = () => {
           )}
         </Paper>
       </Box>
-      
-      {/* Ban User Dialog */}
-      <Dialog
-        open={banDialogOpen}
-        onClose={handleCloseBanDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{t('admin.banUser')}</DialogTitle>
-        <DialogContent>
-          {!selectedUser ? (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                {t('admin.searchUser')}
-              </Typography>
-              <Box sx={{ display: 'flex', mb: 2 }}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder={t('admin.searchUserPlaceholder')}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  sx={{ mr: 1 }}
-                />
-                <Button
-                  variant="contained"
-                  onClick={handleSearchUsers}
-                  startIcon={<Search />}
-                >
-                  {t('common.search')}
-                </Button>
-              </Box>
-              
-              {searchResults.length > 0 ? (
-                <Grid container spacing={2}>
-                  {searchResults.map((user) => (
-                    <Grid item xs={12} key={user.id}>
-                      <Card>
-                        <CardContent sx={{ py: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar 
-                              src={user.profilePic} 
-                              sx={{ mr: 2 }}
-                            >
-                              {user.username.charAt(0).toUpperCase()}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body1">
-                                {user.username}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {user.email}
-                              </Typography>
-                            </Box>
-                            
-                            <Chip 
-                              label={user.role} 
-                              size="small" 
-                              color={user.role === 'admin' ? 'error' : 'primary'}
-                              sx={{ ml: 'auto' }}
-                            />
-                          </Box>
-                        </CardContent>
-                        <CardActions>
-                          <Button 
-                            size="small" 
-                            onClick={() => handleSelectUser(user)}
-                            disabled={user.role === 'admin'}
-                          >
-                            {t('common.select')}
-                          </Button>
-                        </CardActions>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : searchTerm.length > 0 && (
-                <Alert severity="info">
-                  {t('admin.noUsersFound')}
-                </Alert>
-              )}
-            </Box>
-          ) : (
-            <Box sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <Avatar 
-                  src={selectedUser.profilePic} 
-                  sx={{ width: 50, height: 50, mr: 2 }}
-                >
-                  {selectedUser.username.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box>
-                  <Typography variant="h6">
-                    {selectedUser.username}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedUser.email}
-                  </Typography>
-                </Box>
-                
-                <Chip 
-                  label={selectedUser.role} 
-                  size="small"
-                  sx={{ ml: 'auto' }}
-                />
-              </Box>
-              
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <TextField
-                  label={t('admin.banReason')}
-                  value={banForm.reason}
-                  onChange={handleBanFormChange('reason')}
-                  multiline
-                  rows={3}
-                  required
-                  error={banUserMutation.isError}
-                  helperText={banUserMutation.error?.message}
-                />
-              </FormControl>
-              
-              <FormControl fullWidth>
-                <InputLabel>{t('admin.banDuration')}</InputLabel>
-                <Select
-                  value={banForm.banDuration}
-                  onChange={handleBanFormChange('banDuration')}
-                  label={t('admin.banDuration')}
-                >
-                  <MenuItem value="1d">{t('admin.banDuration1Day')}</MenuItem>
-                  <MenuItem value="3d">{t('admin.banDuration3Days')}</MenuItem>
-                  <MenuItem value="7d">{t('admin.banDuration1Week')}</MenuItem>
-                  <MenuItem value="30d">{t('admin.banDuration30Days')}</MenuItem>
-                  <MenuItem value="permanent">{t('admin.banDurationPermanent')}</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseBanDialog}>
-            {t('common.cancel')}
-          </Button>
-          {selectedUser && (
-            <Button
-              onClick={handleBanSubmit}
-              variant="contained"
-              color="error"
-              disabled={!banForm.reason || banUserMutation.isLoading}
-            >
-              {banUserMutation.isLoading ? t('common.loading') : t('admin.banUser')}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };

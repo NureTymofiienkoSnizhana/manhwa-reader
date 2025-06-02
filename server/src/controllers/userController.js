@@ -90,7 +90,8 @@ const getUserProfile = async (req, res, next) => {
         nextLevelExp,
         progress,
         language: user.language,
-        darkMode: user.darkMode
+        darkMode: user.darkMode,
+        createdAt: user.createdAt  
       },
       stats: readingStats[0] || {
         totalManhwa: 0,

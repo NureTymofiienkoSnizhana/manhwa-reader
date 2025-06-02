@@ -6,6 +6,7 @@ export const getUsers = async (params = {}) => {
     const response = await api.get('/admin/users', { params });
     return response.data;
   } catch (error) {
+    console.error('getUsers error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -13,9 +14,11 @@ export const getUsers = async (params = {}) => {
 // Update user role
 export const updateUserRole = async (userId, role) => {
   try {
+    console.log('updateUserRole called with:', { userId, role });
     const response = await api.put('/admin/users/role', { userId, role });
     return response.data;
   } catch (error) {
+    console.error('updateUserRole error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -23,9 +26,11 @@ export const updateUserRole = async (userId, role) => {
 // Delete user
 export const deleteUser = async (userId) => {
   try {
+    console.log('deleteUser called with:', userId);
     const response = await api.delete(`/admin/users/${userId}`);
     return response.data;
   } catch (error) {
+    console.error('deleteUser error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -33,9 +38,11 @@ export const deleteUser = async (userId) => {
 // Unban user
 export const unbanUser = async (userId) => {
   try {
+    console.log('unbanUser called with:', userId);
     const response = await api.delete(`/admin/ban/${userId}`);
     return response.data;
   } catch (error) {
+    console.error('unbanUser error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -46,6 +53,7 @@ export const searchUsers = async (query) => {
     const response = await api.get('/admin/users/search', { params: { query } });
     return response.data;
   } catch (error) {
+    console.error('searchUsers error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -56,6 +64,7 @@ export const getLevelTasks = async () => {
     const response = await api.get('/admin/level-tasks');
     return response.data;
   } catch (error) {
+    console.error('getLevelTasks error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -66,6 +75,7 @@ export const updateLevelTask = async (level, taskData) => {
     const response = await api.post(`/admin/level-tasks/${level}`, taskData);
     return response.data;
   } catch (error) {
+    console.error('updateLevelTask error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -76,6 +86,7 @@ export const deleteLevelTask = async (level) => {
     const response = await api.delete(`/admin/level-tasks/${level}`);
     return response.data;
   } catch (error) {
+    console.error('deleteLevelTask error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -86,6 +97,7 @@ export const getActiveBans = async () => {
     const response = await api.get('/admin/bans/active');
     return response.data;
   } catch (error) {
+    console.error('getActiveBans error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -96,6 +108,7 @@ export const getBanHistory = async () => {
     const response = await api.get('/admin/bans/history');
     return response.data;
   } catch (error) {
+    console.error('getBanHistory error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -103,14 +116,14 @@ export const getBanHistory = async () => {
 // Ban user
 export const banUser = async (banData) => {
   try {
+    console.log('banUser called with:', banData);
     const response = await api.post('/admin/ban', banData);
     return response.data;
   } catch (error) {
+    console.error('banUser error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
-
-
 
 // Get platform statistics
 export const getPlatformStatistics = async () => {
@@ -118,6 +131,7 @@ export const getPlatformStatistics = async () => {
     const response = await api.get('/admin/statistics');
     return response.data;
   } catch (error) {
+    console.error('getPlatformStatistics error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -128,6 +142,7 @@ export const getTopReaders = async (limit = 10) => {
     const response = await api.get('/admin/statistics/top-readers', { params: { limit } });
     return response.data;
   } catch (error) {
+    console.error('getTopReaders error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };
@@ -138,6 +153,7 @@ export const getTopLevelUsers = async (limit = 10) => {
     const response = await api.get('/admin/statistics/top-levels', { params: { limit } });
     return response.data;
   } catch (error) {
+    console.error('getTopLevelUsers error:', error);
     throw error.response ? error.response.data : new Error('Server error');
   }
 };

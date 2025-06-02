@@ -333,7 +333,8 @@
     "noReplies": "No replies yet",
     "added": "Added",
     "refresh": "Refresh",
-    "manage": "Manage"
+    "manage": "Manage",
+    "select": "Select"
   },
   "upload": {
     "dashboard": "Upload Dashboard",

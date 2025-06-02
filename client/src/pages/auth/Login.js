@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -15,10 +15,11 @@ import { LockOutlined as LockOutlinedIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
+import { login } from '../../api/authService';
 
 const Login = () => {
   const { t } = useTranslation();
-  const { loginUser } = useAuth();
+  const { loginUser, setUserBan } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -69,13 +70,30 @@ const Login = () => {
     setAlert({ type: '', message: '' });
     
     try {
-      await loginUser(formData);
+      // Використовуємо безпосередньо функцію API, а не контекст
+      const response = await login(formData);
+      
+      // Якщо успішний вхід, просто перенаправляємо
       navigate(from, { replace: true });
     } catch (error) {
-      setAlert({
-        type: 'error',
-        message: error.message || 'Login failed. Please check your credentials.'
-      });
+      console.error("Login error:", error);
+      
+      // Перевіряємо, чи помилка через бан
+      if (error.response && error.response.status === 403 && error.response.data.ban) {
+        console.log("User is banned:", error.response.data.ban);
+        
+        // Зберігаємо інформацію про бан та токен у локальному сховищі
+        localStorage.setItem('userBan', JSON.stringify(error.response.data.ban));
+        
+        // Перенаправляємо на сторінку бану
+        navigate('/banned');
+      } else {
+        // Інші помилки входу
+        setAlert({
+          type: 'error',
+          message: error.response?.data?.message || 'Login failed. Please check your credentials.'
+        });
+      }
     } finally {
       setIsLoading(false);
     }

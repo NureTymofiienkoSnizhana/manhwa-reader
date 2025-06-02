@@ -229,6 +229,7 @@
     "status": "Статус",
     "active": "Активний",
     "inactive": "Неактивний",
+    "searchUser": "Пошук користувача",
     "searchUsers": "Пошук користувачів",
     "searchUserPlaceholder": "Введіть ім'я користувача або email",
     "banReason": "Причина блокування",
@@ -314,7 +315,8 @@
     "noReplies": "Відповідей ще немає",
     "added": "Додано",
     "refresh": "Оновити",
-    "manage": "Керувати"
+    "manage": "Керувати",
+    "select": "Вибрати"
   },
   "upload": {
     "dashboard": "Панель завантаження",

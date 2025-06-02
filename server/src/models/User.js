@@ -44,7 +44,6 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
   isBanned: {
     type: Boolean,
     default: false
@@ -63,7 +62,6 @@ const UserSchema = new mongoose.Schema({
   banExpiresAt: {
     type: Date 
   },
-  
   profilePicture: {
     type: String 
   },
@@ -71,7 +69,6 @@ const UserSchema = new mongoose.Schema({
     type: String,
     maxlength: 500
   },
-  
   totalManhwasRead: {
     type: Number,
     default: 0
@@ -84,8 +81,6 @@ const UserSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
-  // Settings
   settings: {
     notifications: {
       newChapters: { type: Boolean, default: true },
@@ -108,7 +103,6 @@ const UserSchema = new mongoose.Schema({
       soundEffects: { type: Boolean, default: true }
     }
   },
-  
   createdAt: {
     type: Date,
     default: Date.now
@@ -157,6 +151,7 @@ UserSchema.methods.addExperience = function(amount) {
 
 // Method to ban user
 UserSchema.methods.banUser = function(reason, bannedBy, expiresAt = null) {
+  console.log(`Banning user ${this.username} with reason: ${reason}`);
   this.isBanned = true;
   this.banReason = reason;
   this.bannedAt = new Date();
@@ -166,6 +161,7 @@ UserSchema.methods.banUser = function(reason, bannedBy, expiresAt = null) {
 
 // Method to unban user
 UserSchema.methods.unbanUser = function() {
+  console.log(`Unbanning user ${this.username}`);
   this.isBanned = false;
   this.banReason = undefined;
   this.bannedAt = undefined;
@@ -176,7 +172,7 @@ UserSchema.methods.unbanUser = function() {
 // Method to check if ban is expired
 UserSchema.methods.isBanExpired = function() {
   if (!this.isBanned) return false;
-  if (!this.banExpiresAt) return false; // Permanent ban
+  if (!this.banExpiresAt) return false;
   return new Date() > this.banExpiresAt;
 };
 

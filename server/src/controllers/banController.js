@@ -1,6 +1,7 @@
 const Ban = require('../models/Ban');
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 
 // Отримати всі активні бани
 const getActiveBans = async (req, res, next) => {
@@ -12,6 +13,7 @@ const getActiveBans = async (req, res, next) => {
     
     res.json({ bans });
   } catch (error) {
+    console.error('Error in getActiveBans:', error);
     next(error);
   }
 };
@@ -26,6 +28,7 @@ const getBanHistory = async (req, res, next) => {
     
     res.json({ bans });
   } catch (error) {
+    console.error('Error in getBanHistory:', error);
     next(error);
   }
 };
@@ -39,6 +42,12 @@ const banUser = async (req, res, next) => {
     }
     
     const { userId, reason, banDuration } = req.body;
+    
+    console.log('Banning user:', { userId, reason, banDuration });
+    
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
     
     const user = await User.findById(userId);
     if (!user) {
@@ -76,11 +85,17 @@ const banUser = async (req, res, next) => {
     
     await ban.save();
     
-    user.banUser(reason, req.user.id, banDuration === 'permanent' ? null : bannedUntil);
+    user.isBanned = true;
+    user.banReason = reason;
+    user.bannedAt = now;
+    user.bannedBy = req.user.id;
+    user.banExpiresAt = banDuration === 'permanent' ? null : bannedUntil;
+    
     await user.save();
     
     res.status(201).json({ message: 'User banned successfully', ban });
   } catch (error) {
+    console.error('Error in banUser:', error);
     next(error);
   }
 };
@@ -89,6 +104,12 @@ const banUser = async (req, res, next) => {
 const unbanUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
+    
+    console.log('Unbanning user:', userId);
+    
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
     
     const user = await User.findById(userId);
     if (!user) {
@@ -100,11 +121,17 @@ const unbanUser = async (req, res, next) => {
       { isActive: false }
     );
     
-    user.unbanUser();
+    user.isBanned = false;
+    user.banReason = undefined;
+    user.bannedAt = undefined;
+    user.bannedBy = undefined;
+    user.banExpiresAt = undefined;
+    
     await user.save();
     
-    res.json({ message: 'User unbanned successfully' });
+    res.json({ message: 'User unbanned successfully', affected: result.nModified });
   } catch (error) {
+    console.error('Error in unbanUser:', error);
     next(error);
   }
 };
